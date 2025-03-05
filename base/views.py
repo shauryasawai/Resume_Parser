@@ -24,27 +24,27 @@ def extract_resume_text(pdf_path):
     except Exception as e:
         return f"Error extracting text: {e}"
 
+import re
+
 def process_resume_content(extracted_text):
-    """Process extracted text into structured data"""
+    """Process extracted text into structured data."""
     sections = {
-        'education': ['education', 'academic background', 'qualifications'],
+        'education': ['education', 'academic background', 'qualifications', 'degree'],
         'work_experience': ['work experience', 'professional experience', 'employment history'],
         'skills': ['skills', 'technical skills', 'skill set'],
         'certifications': ['certifications', 'certificates'],
-        'languages': ['languages']
+        'languages': ['languages'],
+        'designation': ['designation', 'role', 'position', 'title', 'current role']
     }
 
     resume_data = {
         'candidate_name': None,
-        'email_id': None,
         'contact_number': None,
-        'linkedin_url': None,
+        'candidate_location': None,
+        'current_designation': None,
         'experience': None,
-        'qualifications': [],
-        'skillset': [],
-        'work_experience_details': [],
-        'certifications': [],
-        'languages': []
+        'linkedin_url': None,
+        'qualifications': []
     }
 
     # Extract contact info
@@ -60,10 +60,33 @@ def process_resume_content(extracted_text):
     if linkedin_match:
         resume_data['linkedin_url'] = linkedin_match.group(0)
 
-    # Experience extraction
+    # Extract candidate location
+    location_match = re.search(r'(current location|located at|based in|resides in|Contact)[:\s]*([\w\s,]+)', extracted_text, re.IGNORECASE)
+    if location_match:
+        resume_data['candidate_location'] = location_match.group(2).strip()
+
+    # Extract experience
     experience_match = re.search(r'(\d+)\+?\s*(years?|yrs?)\b', extracted_text, re.IGNORECASE)
     if experience_match:
         resume_data['experience'] = f"{experience_match.group(1)} years"
+
+    # Extract current designation
+    designation_match = re.search(r'(designation|role|position|title|current role)[:\s]*([\w\s]+)', extracted_text, re.IGNORECASE)
+    if designation_match:
+        resume_data['current_designation'] = designation_match.group(2).strip()
+
+    # Extract candidate name (first capitalized words at the start of the resume)
+    def extract_name(text):
+        """Extracts candidate name from the top of the resume (first 5 lines)."""
+        lines = text.split("\n")[:5]  # Consider only first 5 lines
+        for line in lines:
+            line = line.strip()
+            if len(line.split()) in [2, 3]:  # Candidate name usually has 2-3 words
+                if re.match(r'^[A-Z][a-z]+(?:\s[A-Z][a-z]+){1,2}$', line):  # Name pattern
+                    return line
+        return None
+
+    resume_data['candidate_name'] = extract_name(extracted_text)
 
     # Process sections
     lines = extracted_text.split('\n')
@@ -77,38 +100,68 @@ def process_resume_content(extracted_text):
                 current_section = section
                 break
         if current_section:
-            section_content[current_section].append(line)
+            section_content[current_section].append(line.strip())
 
-    resume_data['qualifications'] = [' '.join(section_content['education'])] if section_content['education'] else []
-    resume_data['skillset'] = [skill.strip() for skill in ', '.join(section_content['skills']).split(',') if skill]
-    resume_data['work_experience_details'] = [' '.join(section_content['work_experience'])] if section_content['work_experience'] else []
-    resume_data['certifications'] = section_content['certifications']
-    resume_data['languages'] = [lang.strip() for lang in ', '.join(section_content['languages']).split(',') if lang]
+    # Extract qualifications (degree names like B.Tech, MBA, M.Sc, etc.)
+    degree_patterns = r'(B\.?Tech|Bachelors?|M\.?Tech|Masters?|M\.?Sc|B\.?Sc|MBA|Ph\.?D|Doctorate|Diploma|Engineering|Computer Science|Management)'
+    qualifications = re.findall(degree_patterns, extracted_text, re.IGNORECASE)
+    resume_data['qualifications'] = list(set(qualifications))  # Remove duplicates
 
     return resume_data
+
+
 
 import pandas as pd
 import os
 
-def save_to_excel(resume_data, file_path="uploads/Parser to Data Entry test"):
-    """Save extracted resume data to an Excel file and append new data."""
-    
-    # Convert JSON to DataFrame
-    df_new = pd.DataFrame([resume_data])
+import pandas as pd
+import os
 
+def save_to_excel(resume_data, file_path="uploads/Parser_to_Data_Entry_test.xlsx"):
+    """Save extracted resume data to an Excel file and append new data under the correct columns."""
+    
+    # Define the expected column names
+    expected_columns = [
+        "Candidate Name", "Contact Number", "Email of Candidate", "Candidate Location", "Current Designation", 
+        "Experience", "LinkedIn URL", "Qualifications"
+    ]
+    
+    # Convert JSON to DataFrame with correct column names
+    df_new = pd.DataFrame([resume_data])
+    df_new.rename(columns={
+        "candidate_name": "Candidate Name",
+        "contact_number": "Contact Number",
+        "contact_email": "Email of Candidate",
+        "candidate_location": "Candidate Location",
+        "current_designation": "Current Designation",
+        "experience": "Experience",
+        "linkedin_url": "LinkedIn URL",
+        "qualifications": "Qualifications"
+    }, inplace=True)
+    
+    # Ensure qualifications are stored as a string if it's a list
+    if "Qualifications" in df_new.columns:
+        df_new["Qualifications"] = df_new["Qualifications"].apply(lambda x: ', '.join(x) if isinstance(x, list) else x)
+    
     if os.path.exists(file_path):
         # Load existing data
         df_existing = pd.read_excel(file_path)
         
+        # Ensure all expected columns exist
+        for col in expected_columns:
+            if col not in df_existing.columns:
+                df_existing[col] = None  # Add missing columns with None values
+        
         # Append new data
         df_final = pd.concat([df_existing, df_new], ignore_index=True)
     else:
-        # If file does not exist, create a new one
-        df_final = df_new
-
+        # If file does not exist, create a new one with the correct column order
+        df_final = df_new.reindex(columns=expected_columns)
+    
     # Save to Excel
     df_final.to_excel(file_path, index=False)
     print("✅ Excel updated successfully!")
+
 
 
 def send_data_to_appsheet(data):
