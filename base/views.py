@@ -14,7 +14,7 @@ APPSHEET_ACCESS_KEY = "V2-pL7rg-a3jss-c4SVT-9reJ9-4FHk4-MLRb1-OhrpE-3vOyJ"
 APPSHEET_TABLE_NAME = "Parser to Data Entry test"
 
 # Path to store extracted data in Excel
-EXCEL_FILE_PATH = "uploads/Parser_to_Data_Entry_test.xlsx"
+EXCEL_FILE_PATH = "uploads/Parser to Data Entry test.xlsx"
 
 def extract_resume_text(pdf_path):
     """Extract text from a PDF resume."""
@@ -117,7 +117,7 @@ import os
 import pandas as pd
 import os
 
-def save_to_excel(resume_data, file_path="uploads/Parser_to_Data_Entry_test.xlsx"):
+def save_to_excel(resume_data, file_path="uploads/Parser to Data Entry test.xlsx"):
     """Save extracted resume data to an Excel file and append new data under the correct columns."""
     
     # Define the expected column names
@@ -191,30 +191,55 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 
 @csrf_exempt
-def upload_resume_and_send(request):
-    """Handle resume upload, process it, save to Excel, and send to AppSheet"""
-    if request.method == 'POST' and request.FILES.get('resume'):
-        resume_file = request.FILES['resume']
-        fs = FileSystemStorage(location='uploads/')
-        filename = fs.save(resume_file.name, resume_file)
-        file_path = os.path.join('uploads', filename)
+def upload_resume_and_review(request):
+    """Upload resume, extract data, and show for review before saving."""
+    if request.method == "POST" and request.FILES.get("resume"):
+        uploaded_file = request.FILES["resume"]
+        file_path = os.path.join("uploads", uploaded_file.name)
+        os.makedirs("uploads", exist_ok=True)
+
+        with open(file_path, "wb+") as destination:
+            for chunk in uploaded_file.chunks():
+                destination.write(chunk)
 
         extracted_text = extract_resume_text(file_path)
-        if extracted_text:
-            resume_data = process_resume_content(extracted_text)
+        resume_data = process_resume_content(extracted_text)
+        
+        return render(request, 'base/review_data.html', {"resume_data": resume_data})
 
-            # Save data to Excel
-            save_to_excel(resume_data, "uploads/Parser to Data Entry test.xlsx")  # Pass the second argument
+    return render(request, 'base/upload.html')
 
-            # Send data to AppSheet
-            appsheet_response = send_data_to_appsheet(resume_data)
+@csrf_exempt
+def save_edited_resume(request):
+    """Save edited data to Excel and AppSheet after user review."""
+    if request.method == "POST":
+        edited_data = request.POST
+        resume_data = {
+            "candidate_name": edited_data.get("candidate_name"),
+            "contact_number": edited_data.get("contact_number"),
+            "email_id": edited_data.get("email_id"),
+            "candidate_location": edited_data.get("candidate_location"),
+            "current_designation": edited_data.get("current_designation"),
+            "experience": edited_data.get("experience"),
+            "linkedin_url": edited_data.get("linkedin_url"),
+            "qualifications": edited_data.get("qualifications")
+        }
 
-            return JsonResponse({
-                'message': 'Resume processed successfully',
-                'data': resume_data,
-                'appsheet_response': appsheet_response
-            })
+        # Save to Excel
+        df = pd.DataFrame([resume_data])
 
-        return JsonResponse({'error': 'Failed to process resume'}, status=400)
+        if os.path.exists(EXCEL_FILE_PATH):
+            existing_df = pd.read_excel(EXCEL_FILE_PATH)
+            df = pd.concat([existing_df, df], ignore_index=True)
 
-    return JsonResponse({'error': 'Invalid request. Use POST with a file.'}, status=400)
+        df.to_excel(EXCEL_FILE_PATH, index=False)
+
+        # Send to AppSheet
+        api_response = send_data_to_appsheet(resume_data)
+
+        return JsonResponse({
+            "message": "Data updated and saved successfully!",
+            "appsheet_response": api_response
+        })
+
+    return JsonResponse({"error": "Invalid request method"}, status=400)

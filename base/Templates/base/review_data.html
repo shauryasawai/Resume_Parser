@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Review Resume Data</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f7fa;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 50px auto;
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        h1 {
+            text-align: center;
+            color: #4CAF50;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            font-weight: bold;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Review Resume Data</h1>
+
+    <form method="POST" action="{% url 'save_edited_resume' %}">
+        {% csrf_token %}
+
+        <div class="form-group">
+            <label for="candidate_name">Candidate Name:</label>
+            <input type="text" id="candidate_name" name="candidate_name" value="{{ resume_data.candidate_name }}" required>
+        </div>
+
+        <div class="form-group">
+            <label for="email_id">Email ID:</label>
+            <input type="text" id="email_id" name="email_id" value="{{ resume_data.email_id }}" required>
+        </div>
+
+        <div class="form-group">
+            <label for="contact_number">Contact Number:</label>
+            <input type="text" id="contact_number" name="contact_number" value="{{ resume_data.contact_number }}" required>
+        </div>
+
+        <div class="form-group">
+            <label for="linkedin_url">LinkedIn URL:</label>
+            <input type="text" id="linkedin_url" name="linkedin_url" value="{{ resume_data.linkedin_url }}">
+        </div>
+
+        <div class="form-group">
+            <label for="experience">Experience:</label>
+            <input type="text" id="experience" name="experience" value="{{ resume_data.experience }}">
+        </div>
+
+        <div class="form-group">
+            <label for="qualifications">Qualifications:</label>
+            <textarea id="qualifications" name="qualifications">{{ resume_data.qualifications|join:", " }}</textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="skillset">Skillset:</label>
+            <textarea id="skillset" name="skillset">{{ resume_data.skillset|join:", " }}</textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="work_experience_details">Work Experience Details:</label>
+            <textarea id="work_experience_details" name="work_experience_details">{{ resume_data.work_experience_details|join:", " }}</textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="certifications">Certifications:</label>
+            <textarea id="certifications" name="certifications">{{ resume_data.certifications|join:", " }}</textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="languages">Languages:</label>
+            <textarea id="languages" name="languages">{{ resume_data.languages|join:", " }}</textarea>
+        </div>
+
+        <button type="submit">Save Data</button>
+    </form>
+</div>
+
+</body>
+</html>
